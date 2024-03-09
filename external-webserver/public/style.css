@@ -21,7 +21,7 @@ body {
     color: var(--text);
     display: grid;
     place-items: center;
-    font: 1.5em/1.5 Nunito, sans-serif;
+    font: 1.25em/1.5 Nunito, sans-serif;
     height: 100vh;
 }
 
