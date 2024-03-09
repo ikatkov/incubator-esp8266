@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>CodePen - Neumorphic Thermostat</title>
+  <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&amp;display=swap'><link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+<!-- partial:index.partial.html -->
+<div class="temp">
+    <div class="main__heading">Current Temperature</div>
+	<div class="temp__dial">
+		<div class="temp__drag"></div>
+		<div class="temp__dial-shades">
+			<div class="temp__shade-cold"></div>
+			<div class="temp__shade-hot"></div>
+		</div>
+		<div class="temp__dial-core"></div>
+        <div class="temp__value">
+			<span class="temp__digit">2</span><span class="temp__digit">0</span>°
+		</div>
+	</div>
+	<div class="temp__outdoors">
+		<div class="temp__outdoors-col">
+			<small class="temp__heading">Set</small>
+			<br>
+			<span class="temp__o-value">0°</span>
+		</div>
+		<div class="temp__outdoors-col">
+            <small class="temp__heading">State</small>
+			<br>
+			<span class="temp__o-value">HEAT</span>
+		</div>
+	</div>
+</div>
+<!-- partial -->
+<script src='gsap.js'></script>
+<script src='Draggable.js'></script>
+<script src="script.js"></script>
+
+</body>
+</html>
