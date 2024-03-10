@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const hostname = '192.168.1.192';
+const hostname = '0.0.0.0';
 const port = 8080;
 let temp = 25;
 let setTemp = 40;
@@ -21,6 +21,7 @@ const server = http.createServer((req, res) => {
             "setTemp": setTemp,
             "state": state
         })
+        temp = temp + 1;
         res.end(json);
     } else if (req.method == 'GET') {
         const urlObj = new URL(req.url, `http://${req.headers.host}`);
