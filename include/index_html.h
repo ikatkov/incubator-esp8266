@@ -45,7 +45,6 @@ const String indexHtml = R"=====(
     window.addEventListener('message', receiveMessage, false);
 
     function receiveMessage(event) {
-
         if(!event.data || event.data === 'null') {
             console.log("READ request");
             // Make GET request to retrieve temperature data
@@ -65,10 +64,12 @@ const String indexHtml = R"=====(
                 const state = data.state;
 
                 const iframeWindow = document.getElementById('myIframe').contentWindow;
-                iframeWindow.postMessage({ temp, setTemp, state }, '*'); // '*' allows communication across different origins
+                iframeWindow.postMessage({ temp, setTemp, state }, '*'); 
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error on GET:', error);
+                const iframeWindow = document.getElementById('myIframe').contentWindow;
+                iframeWindow.postMessage({  temp: 0, setTemp: 0, state: "Error"  }, '*'); 
             });
         }
         else
@@ -94,16 +95,12 @@ const String indexHtml = R"=====(
                 } else {
                     console.error('Failed to set temperature');
                 }
-                // Get reference to the iframe element
-                var iframe = document.getElementById('myIframe');
-
-                // Reload the iframe
-                // iframe.src = iframe.src;
                 window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
-                console.log('refreshed');
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error on POST:', error);
+                const iframeWindow = document.getElementById('myIframe').contentWindow;
+                iframeWindow.postMessage({  temp: 0, setTemp: 0, state: "Error"  }, '*'); 
             });
         }
     }
