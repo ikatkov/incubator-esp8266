@@ -4,14 +4,16 @@
 #include <OneWire.h>
 /* Put your SSID & Password */
 #include "credentials.h"
+#include "index_html.h"
 
 #define BUZZER_PIN D0
-#define TEMP_PIN D1
-#define LED_PIN D2
+#define DS1820_PIN D1
+#define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
+#define TEMP_HYSTERESIS 1
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-OneWire oneWire(TEMP_PIN);
+OneWire oneWire(DS1820_PIN);
 
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
@@ -22,117 +24,6 @@ int setTemp = 0;
 String state = "Idle";
 
 ESP8266WebServer server(80);
-
-const String indexHtml = R"=====(
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="iframeUrl" content="https://incubator.katkovonline.com">
-<title>Incubator</title>
-<style>
-    body, html {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-    }
-    iframe {
-        width: 100%;
-        height: 100%;
-        border: none; /* remove iframe border */
-    }
-</style>
-</head>
-<body>
-
-<iframe id="myIframe" src="" frameborder="0"></iframe>
-
-<script>
-    // Add an event listener for the window load event
-    window.addEventListener('load', function() {
-        // Dispatch an event to itself with data 'null' upon loading
-        window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
-    });
-
-    window.addEventListener('message', receiveMessage, false);
-
-    function receiveMessage(event) {
-
-        if(!event.data || event.data === 'null') {
-            console.log("READ request");
-            // Make GET request to retrieve temperature data
-            fetch('/api/temp')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to retrieve temperature data');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Received data:");
-                console.log(data);
-                // Parse the received JSON
-                const temp = data.temp;
-                const setTemp = data.setTemp;
-                const state = data.state;
-
-                // Read iframe URL from meta tag
-                const iframeUrl = document.querySelector('meta[name="iframeUrl"]').content;
-
-                // Construct the iframe URL with the parsed values
-                const fullUrl = `${iframeUrl}/?temp=${temp}&setTemp=${setTemp}&state=${state}`;
-
-                // Set the iframe src attribute
-                document.getElementById('myIframe').src = fullUrl;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        }
-        else
-        {
-            console.log('WRITE request');
-            // Extract inputVal from the received message
-            const inputVal = event.data.inputVal;
-
-            // Make API call
-            fetch('/api/temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    temperature: inputVal
-                })
-            })
-            .then(response => {
-                // Handle the response from the API
-                if (response.ok) {
-                    console.log('Temperature set successfully');
-                } else {
-                    console.error('Failed to set temperature');
-                }
-                // Get reference to the iframe element
-                var iframe = document.getElementById('myIframe');
-
-                // Reload the iframe
-                // iframe.src = iframe.src;
-                window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
-                console.log('refreshed');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        }
-    }
-</script>
-
-</body>
-</html>
-
-)=====";
 
 void handle_getAPI()
 {
@@ -173,12 +64,32 @@ void make_beep()
     digitalWrite(BUZZER_PIN, LOW);
 }
 
+void processPID()
+{
+    Serial.println("processPID");
+    if (temp + TEMP_HYSTERESIS < setTemp)
+    {
+        state = "Heating";
+        digitalWrite(HEATER_PIN, HIGH);
+    }
+    else if (temp + TEMP_HYSTERESIS > setTemp)
+    {
+        state = "Cooling";
+        digitalWrite(HEATER_PIN, LOW);
+    }
+    else
+    {
+        state = "Idle";
+        digitalWrite(HEATER_PIN, LOW);
+    }
+}
+
 void setup()
 {
     pinMode(BUZZER_PIN, OUTPUT);
-    pinMode(LED_PIN, OUTPUT);
+    pinMode(HEATER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(HEATER_PIN, LOW);
     make_beep();
     Serial.begin(115200);
 
@@ -216,11 +127,13 @@ void setup()
 void loop()
 {
     server.handleClient();
+    processPID();
     if (lastTempReadingMs + TEMP_CHECK_INTERVAL < millis())
     {
         sensors.requestTemperatures();
         temp = round(sensors.getTempCByIndex(0));
         Serial.print(temp);
         Serial.println("ºC");
+        lastTempReadingMs = millis();
     }
 }
