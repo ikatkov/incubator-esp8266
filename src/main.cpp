@@ -17,14 +17,14 @@
 OneWire oneWire(DS1820_PIN);
 DallasTemperature sensors(&oneWire);
 
-JsonDocument doc;
-
 u_int64_t lastTempReadingMs;
 int temp = 0;
 int setTemp = 0;
 String state = "Idle";
 
 ESP8266WebServer server(80);
+JsonDocument responseJSON;
+JsonDocument requestJSON;
 
 void make_beep()
 {
@@ -36,7 +36,11 @@ void make_beep()
 void handle_getAPI()
 {
     Serial.println("Handling GET API request");
-    String json = "{ \"temp\":" + String(temp) + ",\n\"setTemp\":" + String(setTemp) + ",\n\"state\": \"" + state + "\"\n}";
+    responseJSON["temp"] = temp;
+    responseJSON["setTemp"] = setTemp;
+    responseJSON["state"] = state;
+    String json;
+    serializeJson(responseJSON, json);
     Serial.println(json);
     server.send(200, "text/html", json);
 }
@@ -52,14 +56,14 @@ void handle_postAPI()
     Serial.println("POST body:");
     Serial.println(postBody);
 
-    if (deserializeJson(doc, postBody) == DeserializationError::Ok)
+    if (deserializeJson(requestJSON, postBody) == DeserializationError::Ok)
     {
-        setTemp = doc["temp"];
-        server.send(200, "text/plain", "POST received");
+        setTemp = requestJSON["temp"];
+        server.send(200);
     }
     else
     {
-        server.send(400, "text/plain", "Bad Request");
+        server.send(400);
     }
 }
 
@@ -71,7 +75,7 @@ void handle_indexHtml()
 
 void handle_NotFound()
 {
-    server.send(404, "text/plain", "Not found");
+    server.send(404);
 }
 
 void processPID()
