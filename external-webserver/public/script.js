@@ -9,15 +9,20 @@ function receiveMessageFromParent(event) {
     }
     console.log("Received event");
     console.log(event);
-    // Check if the message contains the data we're expecting
-    if (event.data.temp != undefined && event.data.setTemp != undefined && event.data.state != undefined) {
-        // Process the received data
-        const temp = event.data.temp;
-        const setTemp = event.data.setTemp;
-        const state = event.data.state;
+    if (event.data.messageType != undefined && event.data.messageType == "ApiPostACK") {
+        // Check if the message contains the data we're expecting
+        NProgress.done();
+    } else if (event.data.messageType != undefined && event.data.messageType == "ApiGet") {
+        // Check if the message contains the data we're expecting
+        if (event.data.temp != undefined && event.data.setTemp != undefined && event.data.state != undefined) {
+            // Process the received data
+            const temp = event.data.temp;
+            const setTemp = event.data.setTemp;
+            const state = event.data.state;
 
 
-        thermostat.setValues(temp, setTemp, state);
+            thermostat.setValues(temp, setTemp, state);
+        }
     }
 }
 
@@ -133,6 +138,7 @@ class NeuThermostat {
 
     apiSetTemperature(inputVal) {
         console.log("setTemperature", inputVal);
+        NProgress.start();
         window.parent.postMessage({
             inputVal
         }, '*');
