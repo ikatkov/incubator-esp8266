@@ -84,7 +84,7 @@ const String indexHtml = R"=====(
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    temperature: inputVal
+                    "temp": inputVal
                 })
             })
             .then(response => {

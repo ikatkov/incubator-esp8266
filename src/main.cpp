@@ -2,6 +2,8 @@
 #include <ESP8266WebServer.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include <ArduinoJson.h>
+
 /* Put your SSID & Password */
 #include "credentials.h"
 #include "index_html.h"
@@ -12,11 +14,10 @@
 #define TEMP_CHECK_INTERVAL 1000
 #define TEMP_HYSTERESIS 1
 
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(DS1820_PIN);
-
-// Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
+
+JsonDocument doc;
 
 u_int64_t lastTempReadingMs;
 int temp = 0;
@@ -24,6 +25,13 @@ int setTemp = 0;
 String state = "Idle";
 
 ESP8266WebServer server(80);
+
+void make_beep()
+{
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(200);
+    digitalWrite(BUZZER_PIN, LOW);
+}
 
 void handle_getAPI()
 {
@@ -36,6 +44,7 @@ void handle_getAPI()
 void handle_postAPI()
 {
     Serial.println("Handling POST API request");
+    make_beep();
     // Get the body of the POST request
     String postBody = server.arg("plain");
 
@@ -43,7 +52,15 @@ void handle_postAPI()
     Serial.println("POST body:");
     Serial.println(postBody);
 
-    server.send(200, "text/plain", "POST received");
+    if (deserializeJson(doc, postBody) == DeserializationError::Ok)
+    {
+        setTemp = doc["temp"];
+        server.send(200, "text/plain", "POST received");
+    }
+    else
+    {
+        server.send(400, "text/plain", "Bad Request");
+    }
 }
 
 void handle_indexHtml()
@@ -57,16 +74,9 @@ void handle_NotFound()
     server.send(404, "text/plain", "Not found");
 }
 
-void make_beep()
-{
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(200);
-    digitalWrite(BUZZER_PIN, LOW);
-}
-
 void processPID()
 {
-   
+
     if (temp + TEMP_HYSTERESIS < setTemp)
     {
         state = "Heating";
@@ -117,7 +127,7 @@ void setup()
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);
-    // server.on("/api/temp", HTTP_POST, handle_postAPI);
+    server.on("/api/temp", HTTP_POST, handle_postAPI);
     server.onNotFound(handle_NotFound);
 
     server.begin();
