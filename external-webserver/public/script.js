@@ -264,8 +264,6 @@ class NeuThermostat {
                 prevTemp = Math.round(this.temp)
 
             this.temp = inputVal;
-            // CSS variable
-            this.el.style.setProperty("--angle", `${angle}deg`);
 
             // display value
             if (tempDigits) {
