@@ -33,6 +33,9 @@ const String indexHtml = R"=====(
 <iframe id="myIframe" src="https://incubator.katkovonline.com" frameborder="0"></iframe>
 
 <script>
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     // Add an event listener for the window load event
     window.addEventListener('load', function() {
         // Dispatch an event to itself upon loading to make API call
@@ -47,9 +50,14 @@ const String indexHtml = R"=====(
     function receiveMessage(event) {
         if(!event.data || event.data === 'null') {
             console.log("READ request");
+            // Set a timeout of 3 seconds
+            const timeoutId = setTimeout(() => {
+                controller.abort(); // Abort the fetch request after 3 seconds
+            }, 3000);
             // Make GET request to retrieve temperature data
             fetch('/api/temp')
             .then(response => {
+                clearTimeout(timeoutId); 
                 if (!response.ok) {
                     throw new Error('Failed to retrieve temperature data');
                 }
@@ -78,6 +86,11 @@ const String indexHtml = R"=====(
             // Extract inputVal from the received message
             const inputVal = event.data.inputVal;
 
+            // Set a timeout of 3 seconds
+            const timeoutId = setTimeout(() => {
+                controller.abort(); // Abort the fetch request after 3 seconds
+            }, 3000);
+
             // Make API call
             fetch('/api/temp', {
                 method: 'POST',
@@ -89,6 +102,7 @@ const String indexHtml = R"=====(
                 })
             })
             .then(response => {
+                clearTimeout(timeoutId); 
                 // Handle the response from the API
                 if (response.ok) {
                     console.log('Temperature set successfully');
