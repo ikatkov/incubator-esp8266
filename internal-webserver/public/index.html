@@ -2,7 +2,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="iframeUrl" content="https://incubator.katkovonline.com">
 <title>IFrame Example</title>
 <style>
     body, html {
@@ -21,13 +20,17 @@
 </head>
 <body>
 
-<iframe id="myIframe" src="" frameborder="0"></iframe>
+<!-- <iframe id="myIframe" src="http://localhost:3000" frameborder="0"></iframe> -->
+<iframe id="myIframe" src="https://incubator.katkovonline.com" frameborder="0"></iframe>
 
 <script>
     // Add an event listener for the window load event
     window.addEventListener('load', function() {
-        // Dispatch an event to itself with data 'null' upon loading
+        // Dispatch an event to itself upon loading to make API call
         window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
+        setInterval(function() {
+            window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
+        }, 5000);
     });
 
     window.addEventListener('message', receiveMessage, false);
@@ -52,14 +55,8 @@
                 const setTemp = data.setTemp;
                 const state = data.state;
 
-                // Read iframe URL from meta tag
-                const iframeUrl = document.querySelector('meta[name="iframeUrl"]').content;
-
-                // Construct the iframe URL with the parsed values
-                const fullUrl = `${iframeUrl}/?temp=${temp}&setTemp=${setTemp}&state=${state}`;
-
-                // Set the iframe src attribute
-                document.getElementById('myIframe').src = fullUrl;
+                const iframeWindow = document.getElementById('myIframe').contentWindow;
+                iframeWindow.postMessage({ temp, setTemp, state }, '*'); // '*' allows communication across different origins
             })
             .catch(error => {
                 console.error('Error:', error);

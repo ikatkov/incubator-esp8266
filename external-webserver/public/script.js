@@ -1,11 +1,25 @@
-document.addEventListener("DOMContentLoaded", function () {
-    var params = location.href.split('?')[1].split('&');
-    data = {};
-    for (x in params) {
-        data[params[x].split('=')[0]] = params[x].split('=')[1];
+window.addEventListener('message', receiveMessageFromParent);
+
+function receiveMessageFromParent(event) {
+    // Ensure the message is coming from the expected source
+    // In this case, the parent window
+    if (event.source !== parent) {
+        console.error('Unexpected source:', event.source);
+        return;
     }
-    const thermostat = new NeuThermostat(".temp", data['temp'], data['setTemp'], data['state']);
-});
+    console.log("Received event");
+    console.log(event);
+    // Check if the message contains the data we're expecting
+    if (event.data.temp && event.data.setTemp && event.data.state) {
+        // Process the received data
+        const temp = event.data.temp;
+        const setTemp = event.data.setTemp;
+        const state = event.data.state;
+
+
+        thermostat.setValues(temp, setTemp, state);
+    }
+}
 
 class NeuThermostat {
     constructor(el, temp = 0, setTemp = 0, state = "Idle") {
@@ -57,6 +71,15 @@ class NeuThermostat {
             }
         });
     }
+
+    setValues(temp, setTemp, state) {
+        this.state = state;
+        this.setTemp = setTemp;
+
+        this.tempSet(temp);
+        this.stateAdjust(this.setTemp, this.state);
+    }
+
     angleFromMatrix(transVal) {
         let matrixVal = transVal.split('(')[1].split(')')[0].split(','),
             [cos1, sin] = matrixVal.slice(0, 2),
@@ -113,7 +136,7 @@ class NeuThermostat {
         }, '*');
     }
 
-    setTempAdjust(inputVal = 0) {
+    setTempAdjust(inputVal) {
         /*
         inputVal can be the temp as an integer, "u" for up, 
         "d" for down, or "drag" for dragged value
@@ -231,11 +254,7 @@ class NeuThermostat {
         }
     }
 
-    tempSet(inputVal = 0) {
-        /*
-        inputVal can be the temp as an integer, "u" for up, 
-        "d" for down, or "drag" for dragged value
-        */
+    tempSet(inputVal) {
         if (this.el) {
             let cs = window.getComputedStyle(this.el),
                 tempDigitEls = this.el.querySelectorAll(".temp__digit"),
@@ -243,11 +262,11 @@ class NeuThermostat {
                 tempDrag = this.el.querySelector(".temp__drag"),
                 cold = this.el.querySelector(".temp__shade-cold"),
                 hot = this.el.querySelector(".temp__shade-hot"),
-                prevTemp = Math.round(this.setTemp),
+                prevTemp = Math.round(this.temp),
                 tempRange = this.tempMax - this.tempMin,
                 angleRange = this.angleMax - this.angleMin
 
-
+            this.temp = inputVal;
 
             let relTemp = this.temp - this.tempMin,
                 tempFrac = relTemp / tempRange,
@@ -324,3 +343,5 @@ class NeuThermostat {
         }
     }
 }
+
+const thermostat = new NeuThermostat(".temp");
