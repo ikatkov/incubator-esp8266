@@ -68,6 +68,7 @@ class NeuThermostat {
             },
             onDragEnd: () => {
                 this.apiSetTemperature(Math.round(this.setTemp));
+                let mainHeading = document.querySelector(".main__heading");
                 mainHeading.textContent = "Current Temperature";
             }
         });
