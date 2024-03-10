@@ -10,7 +10,7 @@ function receiveMessageFromParent(event) {
     console.log("Received event");
     console.log(event);
     // Check if the message contains the data we're expecting
-    if (event.data.temp && event.data.setTemp && event.data.state) {
+    if (event.data.temp != undefined && event.data.setTemp != undefined && event.data.state != undefined) {
         // Process the received data
         const temp = event.data.temp;
         const setTemp = event.data.setTemp;

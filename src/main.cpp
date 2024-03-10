@@ -66,7 +66,7 @@ void make_beep()
 
 void processPID()
 {
-    Serial.println("processPID");
+   
     if (temp + TEMP_HYSTERESIS < setTemp)
     {
         state = "Heating";
