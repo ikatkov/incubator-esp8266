@@ -1,94 +1,164 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <DallasTemperature.h>
+#include <OneWire.h>
+/* Put your SSID & Password */
 #include "credentials.h"
 
-/* Put your SSID & Password */
+#define BUZZER_PIN D0
+#define TEMP_PIN D1
+#define LED_PIN D2
+#define TEMP_CHECK_INTERVAL 1000
 
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(TEMP_PIN);
+
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
+
+u_int64_t lastTempReadingMs;
+int temp = 0;
+int setTemp = 0;
+String state = "Idle";
 
 ESP8266WebServer server(80);
 
-uint8_t LED1pin = D0;
-bool LED1status = LOW;
-
-uint8_t LED2pin = D6;
-bool LED2status = LOW;
-
-String SendHTML(uint8_t led1stat, uint8_t led2stat)
-{
-    String ptr = "<!DOCTYPE html> <html>\n";
-    ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-    ptr += "<title>LED Control</title>\n";
-    ptr += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
-    ptr += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
-    ptr += ".button {display: block;width: 80px;background-color: #1abc9c;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
-    ptr += ".button-on {background-color: #1abc9c;}\n";
-    ptr += ".button-on:active {background-color: #16a085;}\n";
-    ptr += ".button-off {background-color: #34495e;}\n";
-    ptr += ".button-off:active {background-color: #2c3e50;}\n";
-    ptr += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
-    ptr += "</style>\n";
-    ptr += "</head>\n";
-    ptr += "<body>\n";
-    ptr += "<h1>ESP8266 Web Server</h1>\n";
-    ptr += "<h3>Using Access Point(AP) Mode</h3>\n";
-
-    if (led1stat)
-    {
-        ptr += "<p>LED1 Status: ON</p><a class=\"button button-off\" href=\"/led1off\">OFF</a>\n";
+const String indexHtml = R"=====(
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="iframeUrl" content="https://incubator.katkovonline.com">
+<title>Incubator</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
     }
-    else
-    {
-        ptr += "<p>LED1 Status: OFF</p><a class=\"button button-on\" href=\"/led1on\">ON</a>\n";
+    iframe {
+        width: 100%;
+        height: 100%;
+        border: none; /* remove iframe border */
     }
+</style>
+</head>
+<body>
 
-    if (led2stat)
-    {
-        ptr += "<p>LED2 Status: ON</p><a class=\"button button-off\" href=\"/led2off\">OFF</a>\n";
+<iframe id="myIframe" src="" frameborder="0"></iframe>
+
+<script>
+    // Add an event listener for the window load event
+    window.addEventListener('load', function() {
+        // Dispatch an event to itself with data 'null' upon loading
+        window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
+    });
+
+    window.addEventListener('message', receiveMessage, false);
+
+    function receiveMessage(event) {
+
+        if(!event.data || event.data === 'null') {
+            console.log("READ request");
+            // Make GET request to retrieve temperature data
+            fetch('/api/temp')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to retrieve temperature data');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Received data:");
+                console.log(data);
+                // Parse the received JSON
+                const temp = data.temp;
+                const setTemp = data.setTemp;
+                const state = data.state;
+
+                // Read iframe URL from meta tag
+                const iframeUrl = document.querySelector('meta[name="iframeUrl"]').content;
+
+                // Construct the iframe URL with the parsed values
+                const fullUrl = `${iframeUrl}/?temp=${temp}&setTemp=${setTemp}&state=${state}`;
+
+                // Set the iframe src attribute
+                document.getElementById('myIframe').src = fullUrl;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+        else
+        {
+            console.log('WRITE request');
+            // Extract inputVal from the received message
+            const inputVal = event.data.inputVal;
+
+            // Make API call
+            fetch('/api/temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    temperature: inputVal
+                })
+            })
+            .then(response => {
+                // Handle the response from the API
+                if (response.ok) {
+                    console.log('Temperature set successfully');
+                } else {
+                    console.error('Failed to set temperature');
+                }
+                // Get reference to the iframe element
+                var iframe = document.getElementById('myIframe');
+
+                // Reload the iframe
+                // iframe.src = iframe.src;
+                window.dispatchEvent(new CustomEvent('message', { detail: 'null' }));
+                console.log('refreshed');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
     }
-    else
-    {
-        ptr += "<p>LED2 Status: OFF</p><a class=\"button button-on\" href=\"/led2on\">ON</a>\n";
-    }
+</script>
 
-    ptr += "</body>\n";
-    ptr += "</html>\n";
-    return ptr;
+</body>
+</html>
+
+)=====";
+
+void handle_getAPI()
+{
+    Serial.println("Handling GET API request");
+    String json = "{ \"temp\":" + String(temp) + ",\n\"setTemp\":" + String(setTemp) + ",\n\"state\": \"" + state + "\"\n}";
+    Serial.println(json);
+    server.send(200, "text/html", json);
 }
 
-void handle_OnConnect()
+void handle_postAPI()
 {
-    LED1status = LOW;
-    LED2status = LOW;
-    Serial.println("GPIO7 Status: OFF | GPIO6 Status: OFF");
-    server.send(200, "text/html", SendHTML(LED1status, LED2status));
+    Serial.println("Handling POST API request");
+    // Get the body of the POST request
+    String postBody = server.arg("plain");
+
+    // Print the body of the POST request
+    Serial.println("POST body:");
+    Serial.println(postBody);
+
+    server.send(200, "text/plain", "POST received");
 }
 
-void handle_led1on()
+void handle_indexHtml()
 {
-    LED1status = HIGH;
-    Serial.println("GPIO7 Status: ON");
-    server.send(200, "text/html", SendHTML(true, LED2status));
-}
-
-void handle_led1off()
-{
-    LED1status = LOW;
-    Serial.println("GPIO7 Status: OFF");
-    server.send(200, "text/html", SendHTML(false, LED2status));
-}
-
-void handle_led2on()
-{
-    LED2status = HIGH;
-    Serial.println("GPIO6 Status: ON");
-    server.send(200, "text/html", SendHTML(LED1status, true));
-}
-
-void handle_led2off()
-{
-    LED2status = LOW;
-    Serial.println("GPIO6 Status: OFF");
-    server.send(200, "text/html", SendHTML(LED1status, false));
+    Serial.println("Sending index.html");
+    server.send(200, "text/html", indexHtml);
 }
 
 void handle_NotFound()
@@ -96,11 +166,24 @@ void handle_NotFound()
     server.send(404, "text/plain", "Not found");
 }
 
+void make_beep()
+{
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(200);
+    digitalWrite(BUZZER_PIN, LOW);
+}
+
 void setup()
 {
+    pinMode(BUZZER_PIN, OUTPUT);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
+    make_beep();
     Serial.begin(115200);
-    pinMode(LED1pin, OUTPUT);
-    pinMode(LED2pin, OUTPUT);
+
+    // Start the DS18B20 sensor
+    sensors.begin();
 
     Serial.println("Connecting to ");
     Serial.println(ssid);
@@ -117,31 +200,27 @@ void setup()
     Serial.println("WiFi connected..!");
     Serial.print("Got IP: ");
     Serial.println(WiFi.localIP());
+    make_beep();
+    delay(500);
+    make_beep();
 
-    server.on("/", handle_OnConnect);
+    server.on("/", handle_indexHtml);
+    server.on("/api/temp", HTTP_GET, handle_getAPI);
+    // server.on("/api/temp", HTTP_POST, handle_postAPI);
     server.onNotFound(handle_NotFound);
 
     server.begin();
     Serial.println("HTTP server started");
 }
+
 void loop()
 {
     server.handleClient();
-    if (LED1status)
+    if (lastTempReadingMs + TEMP_CHECK_INTERVAL < millis())
     {
-        digitalWrite(LED1pin, HIGH);
-    }
-    else
-    {
-        digitalWrite(LED1pin, LOW);
-    }
-
-    if (LED2status)
-    {
-        digitalWrite(LED2pin, HIGH);
-    }
-    else
-    {
-        digitalWrite(LED2pin, LOW);
+        sensors.requestTemperatures();
+        temp = round(sensors.getTempCByIndex(0));
+        Serial.print(temp);
+        Serial.println("ºC");
     }
 }
