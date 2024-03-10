@@ -82,7 +82,7 @@ void processPID()
         state = "Heating";
         digitalWrite(HEATER_PIN, HIGH);
     }
-    else if (temp + TEMP_HYSTERESIS > setTemp)
+    else if (temp - TEMP_HYSTERESIS > setTemp)
     {
         state = "Cooling";
         digitalWrite(HEATER_PIN, LOW);
