@@ -261,31 +261,11 @@ class NeuThermostat {
             let cs = window.getComputedStyle(this.el),
                 tempDigitEls = this.el.querySelectorAll(".temp__digit"),
                 tempDigits = tempDigitEls ? Array.from(tempDigitEls).reverse() : [],
-                tempDrag = this.el.querySelector(".temp__drag"),
-                cold = this.el.querySelector(".temp__shade-cold"),
-                hot = this.el.querySelector(".temp__shade-hot"),
-                prevTemp = Math.round(this.temp),
-                tempRange = this.tempMax - this.tempMin,
-                angleRange = this.angleMax - this.angleMin
+                prevTemp = Math.round(this.temp)
 
             this.temp = inputVal;
-
-            let relTemp = this.temp - this.tempMin,
-                tempFrac = relTemp / tempRange,
-                angle = tempFrac * angleRange + this.angleMin;
-
             // CSS variable
             this.el.style.setProperty("--angle", `${angle}deg`);
-
-            // draggable area
-            if (tempDrag)
-                tempDrag.style.transform = `rotate(${angle}deg)`;
-
-            // shades
-            if (cold)
-                cold.style.opacity = 1 - tempFrac;
-            if (hot)
-                hot.style.opacity = tempFrac;
 
             // display value
             if (tempDigits) {
