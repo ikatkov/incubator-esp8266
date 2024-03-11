@@ -30,8 +30,8 @@ class NeuThermostat {
     constructor(el, temp = 0, setTemp = 0, state = "Connecting") {
         this.el = document.querySelector(el);
         this.temp = temp;
-        this.tempMin = 10;
-        this.tempMax = 61;
+        this.tempMin = 0;
+        this.tempMax = 60;
         this.angleMin = 15;
         this.angleMax = 345;
         this.setTemp = setTemp;
