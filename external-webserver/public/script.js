@@ -138,6 +138,7 @@ class NeuThermostat {
 
     apiSetTemperature(inputVal) {
         console.log("setTemperature", inputVal);
+        NProgress.done();
         NProgress.start();
         window.parent.postMessage({
             inputVal
