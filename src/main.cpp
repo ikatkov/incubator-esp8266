@@ -13,6 +13,7 @@
 #define DS1820_PIN D1
 #define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
+#define WIFI_RETRY_INTERVAL 60000
 #define TEMP_HYSTERESIS 1
 #define EEPROM_ADDRESS 0
 
@@ -20,6 +21,7 @@ OneWire oneWire(DS1820_PIN);
 DallasTemperature sensors(&oneWire);
 
 u_int64_t lastTempReadingMs;
+u_int64_t lastWifiRetryMs;
 u8_t temp = 0;
 u8_t setTemp = 0;
 String state = "Idle";
@@ -108,7 +110,7 @@ void handle_NotFound()
 
 void processPID()
 {
-
+    
     if (temp - TEMP_HYSTERESIS < setTemp)
     {
         state = "Heating";
@@ -118,6 +120,45 @@ void processPID()
     {
         state = "OFF";
         digitalWrite(HEATER_PIN, LOW);
+    }
+}
+
+void connectToWifi(bool mandatory = true)
+{
+    if (WiFi.status() != WL_CONNECTED && lastWifiRetryMs + WIFI_RETRY_INTERVAL < millis())
+    {
+        lastWifiRetryMs = millis();
+        Serial.print("(re)Connecting to: ");
+        Serial.println(ssid);
+        // connect to your local wi-fi network
+        WiFi.begin(ssid, password);
+
+        // check wi-fi is connected to wi-fi network
+        u_int8_t counter = 0;
+        while (WiFi.status() != WL_CONNECTED && counter < 30)
+        {
+            delay(1000);
+            make_beep();
+            Serial.print(".");
+            counter++;
+        }
+        if (WiFi.status() != WL_CONNECTED && mandatory)
+        {
+            Serial.print("No wifi connection afrer 30sec. ESP.reset()");
+            ESP.reset();
+        }
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            Serial.println("");
+            Serial.println("WiFi connected..!");
+            Serial.print("Got IP: ");
+            Serial.println(WiFi.localIP());
+            make_ok_beep();
+        }
+        else
+        {
+            Serial.println("No WiFi, will try again later");
+        }
     }
 }
 
@@ -144,23 +185,7 @@ void setup()
     // Start the DS18B20 sensor
     sensors.begin();
 
-    Serial.print("Connecting to: ");
-    Serial.println(ssid);
-    // connect to your local wi-fi network
-    WiFi.begin(ssid, password);
-
-    // check wi-fi is connected to wi-fi network
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(1000);
-        make_beep();
-        Serial.print(".");
-    }
-    Serial.println("");
-    Serial.println("WiFi connected..!");
-    Serial.print("Got IP: ");
-    Serial.println(WiFi.localIP());
-    make_ok_beep();
+    connectToWifi();
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);
@@ -183,4 +208,5 @@ void loop()
         Serial.println("ºC");
         lastTempReadingMs = millis();
     }
+    connectToWifi(false);
 }
