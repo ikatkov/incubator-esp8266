@@ -42,6 +42,13 @@ void make_beep()
     digitalWrite(BUZZER_PIN, LOW);
 }
 
+void make_long_beep()
+{
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(1000);
+    digitalWrite(BUZZER_PIN, LOW);
+}
+
 void make_ok_beep()
 {
     for (int i = 0; i < 2; i++)
@@ -158,6 +165,7 @@ void connectToWifi(bool mandatory = true)
         else
         {
             Serial.println("No WiFi, will try again later");
+            make_long_beep();
         }
     }
 }

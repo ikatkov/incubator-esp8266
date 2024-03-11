@@ -27,7 +27,7 @@ function receiveMessageFromParent(event) {
 }
 
 class NeuThermostat {
-    constructor(el, temp = 0, setTemp = 0, state = "Connecting") {
+    constructor(el, temp = 0, setTemp = 0, state = "🛜") {
         this.el = document.querySelector(el);
         this.temp = temp;
         this.tempMin = 0;
