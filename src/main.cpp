@@ -110,7 +110,7 @@ void handle_NotFound()
 
 void processPID()
 {
-    
+
     if (temp - TEMP_HYSTERESIS < setTemp)
     {
         state = "Heating";
@@ -125,7 +125,7 @@ void processPID()
 
 void connectToWifi(bool mandatory = true)
 {
-    if (WiFi.status() != WL_CONNECTED && lastWifiRetryMs + WIFI_RETRY_INTERVAL < millis())
+    if (WiFi.status() != WL_CONNECTED && (mandatory || lastWifiRetryMs + WIFI_RETRY_INTERVAL < millis()))
     {
         lastWifiRetryMs = millis();
         Serial.print("(re)Connecting to: ");
