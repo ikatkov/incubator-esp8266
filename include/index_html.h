@@ -48,6 +48,8 @@ const String indexHtml = R"=====(
     window.addEventListener('message', receiveMessage, false);
 
     function receiveMessage(event) {
+        const iframeWindow = document.getElementById('myIframe').contentWindow;
+
         if(!event.data || event.data === 'null') {
             console.log("READ request");
             // Set a timeout of 3 seconds
@@ -71,13 +73,11 @@ const String indexHtml = R"=====(
                 const setTemp = data.setTemp;
                 const state = data.state;
 
-                const iframeWindow = document.getElementById('myIframe').contentWindow;
-                iframeWindow.postMessage({ temp, setTemp, state }, '*'); 
+                iframeWindow.postMessage({ messageType: "ApiGet", temp, setTemp, state }, '*'); 
             })
             .catch(error => {
                 console.error('Error on GET:', error);
-                const iframeWindow = document.getElementById('myIframe').contentWindow;
-                iframeWindow.postMessage({  temp: 0, setTemp: 0, state: "Error"  }, '*'); 
+                iframeWindow.postMessage({  messageType: "ApiGet", temp: 0, setTemp: 0, state: "Offline"  }, '*'); 
             });
         }
         else
@@ -113,9 +113,9 @@ const String indexHtml = R"=====(
             })
             .catch(error => {
                 console.error('Error on POST:', error);
-                const iframeWindow = document.getElementById('myIframe').contentWindow;
-                iframeWindow.postMessage({  temp: 0, setTemp: 0, state: "Error"  }, '*'); 
+                iframeWindow.postMessage({messageType: "ApiGet",  temp: 0, setTemp: 0, state: "Error"  }, '*'); 
             });
+            iframeWindow.postMessage({messageType: "ApiPostACK" }, '*'); 
         }
     }
 </script>

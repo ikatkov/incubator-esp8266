@@ -3,6 +3,7 @@
 #include <DallasTemperature.h>
 #include <OneWire.h>
 #include <ArduinoJson.h>
+#include <EEPROM.h>
 
 /* Put your SSID & Password */
 #include "credentials.h"
@@ -13,24 +14,41 @@
 #define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
 #define TEMP_HYSTERESIS 1
+#define EEPROM_ADDRESS 0
 
 OneWire oneWire(DS1820_PIN);
 DallasTemperature sensors(&oneWire);
 
 u_int64_t lastTempReadingMs;
-int temp = 0;
-int setTemp = 0;
+u8_t temp = 0;
+u8_t setTemp = 0;
 String state = "Idle";
 
 ESP8266WebServer server(80);
 JsonDocument responseJSON;
 JsonDocument requestJSON;
 
+bool isSetTempValid(uint8 value)
+{
+    return value >= 0 && value <= 60;
+}
+
 void make_beep()
 {
     digitalWrite(BUZZER_PIN, HIGH);
     delay(200);
     digitalWrite(BUZZER_PIN, LOW);
+}
+
+void make_ok_beep()
+{
+    for (int i = 0; i < 2; i++)
+    {
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(100);
+        digitalWrite(BUZZER_PIN, LOW);
+        delay(100);
+    }
 }
 
 void handle_getAPI()
@@ -58,8 +76,18 @@ void handle_postAPI()
 
     if (deserializeJson(requestJSON, postBody) == DeserializationError::Ok)
     {
-        setTemp = requestJSON["temp"];
-        server.send(200);
+        uint8_t value = requestJSON["temp"];
+        if (isSetTempValid(value))
+        {
+            setTemp = value;
+            server.send(200);
+            EEPROM.put(EEPROM_ADDRESS, setTemp); // write data to array in ram
+            EEPROM.commit();
+        }
+        else
+        {
+            server.send(400, "Temp out of range [0,60]");
+        }
     }
     else
     {
@@ -81,19 +109,14 @@ void handle_NotFound()
 void processPID()
 {
 
-    if (temp + TEMP_HYSTERESIS < setTemp)
+    if (temp - TEMP_HYSTERESIS < setTemp)
     {
         state = "Heating";
         digitalWrite(HEATER_PIN, HIGH);
     }
-    else if (temp - TEMP_HYSTERESIS > setTemp)
-    {
-        state = "Cooling";
-        digitalWrite(HEATER_PIN, LOW);
-    }
     else
     {
-        state = "Idle";
+        state = "OFF";
         digitalWrite(HEATER_PIN, LOW);
     }
 }
@@ -107,10 +130,21 @@ void setup()
     make_beep();
     Serial.begin(115200);
 
+    // start EEPROM
+    EEPROM.begin(1);
+    EEPROM.get(EEPROM_ADDRESS, setTemp);
+    Serial.print("Read setTemp from eeprom: ");
+    Serial.println(setTemp);
+    if (!isSetTempValid(setTemp))
+    {
+        Serial.println("Read setTemp is invalid. Set to 0");
+        setTemp = 0;
+    }
+
     // Start the DS18B20 sensor
     sensors.begin();
 
-    Serial.println("Connecting to ");
+    Serial.print("Connecting to: ");
     Serial.println(ssid);
     // connect to your local wi-fi network
     WiFi.begin(ssid, password);
@@ -119,15 +153,14 @@ void setup()
     while (WiFi.status() != WL_CONNECTED)
     {
         delay(1000);
+        make_beep();
         Serial.print(".");
     }
     Serial.println("");
     Serial.println("WiFi connected..!");
     Serial.print("Got IP: ");
     Serial.println(WiFi.localIP());
-    make_beep();
-    delay(500);
-    make_beep();
+    make_ok_beep();
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);

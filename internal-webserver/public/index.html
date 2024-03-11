@@ -68,7 +68,7 @@
             })
             .catch(error => {
                 console.error('Error on GET:', error);
-                iframeWindow.postMessage({  messageType: "ApiGet", temp: 0, setTemp: 0, state: "Error"  }, '*'); 
+                iframeWindow.postMessage({  messageType: "ApiGet", temp: 0, setTemp: 0, state: "Offline"  }, '*'); 
             });
         }
         else
