@@ -17,9 +17,12 @@ const server = http.createServer((req, res) => {
         console.log('Arguments:', search);
 
         if (fileUrl == '/' || fileUrl == '')
-            fileUrl = '/index.html';
+            fileUrl = 'index.html';
 
         var filePath = path.resolve('./public/' + fileUrl);
+        if(!fs.existsSync(filePath)){
+            filePath = path.resolve('external-webserver/public/' + fileUrl);
+        }
         const fileExt = path.extname(filePath);
         if (fileExt == '.html') {
             fs.exists(filePath, (exists) => {

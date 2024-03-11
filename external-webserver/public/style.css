@@ -92,8 +92,8 @@ body {
 .temp__dial-core,
 .temp__dial-shades {
     transition-delay: 0.1s;
-    width: 8.5rem;
-    height: 8.5rem;
+    width: 8rem;
+    height: 8rem;
 }
 
 .temp__dial-core {
@@ -101,10 +101,10 @@ body {
     color: hsla(0, 0%, 0%, 0.1);
 }
 
-.temp__dial-shades,
-.temp__drag:before {
+/* .temp__dial-shades, */
+/* .temp__drag:before {
     opacity: 0;
-}
+} */
 
 .temp__shade-cold,
 .temp__shade-hot,
@@ -113,12 +113,12 @@ body {
     height: 100%;
 }
 
-.temp__shade-cold {
-    background-image: radial-gradient(100% 100% at 50% 100%, hsl(193, 90%, 55%), hsl(268, 90%, 55%));
-}
-
 .temp__shade-hot {
     background-image: radial-gradient(100% 100% at 50% 100%, hsl(63, 90%, 55%), hsl(13, 90%, 45%));
+}
+
+.temp__shade-cold {
+    background-image: radial-gradient(100% 100% at 50% 100%, hsl(193, 90%, 55%), hsl(268, 90%, 55%));
 }
 
 .temp__drag {

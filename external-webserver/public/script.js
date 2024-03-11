@@ -57,8 +57,10 @@ class NeuThermostat {
 
         // init values
         this.tempSet(this.temp);
+        this.setTempAdjust(this.temp);
         this.stateAdjust(this.setTemp, this.state);
 
+        const mainHeading = document.querySelector(".main__heading");
         // init GreenSock Draggable
         Draggable.create(".temp__drag", {
             type: "rotation",
@@ -68,12 +70,10 @@ class NeuThermostat {
             },
             onDrag: () => {
                 this.setTempAdjust("drag");
-                let mainHeading = document.querySelector(".main__heading");
                 mainHeading.textContent = "Set Temperature";
             },
             onDragEnd: () => {
                 this.apiSetTemperature(Math.round(this.setTemp));
-                let mainHeading = document.querySelector(".main__heading");
                 mainHeading.textContent = "Current Temperature";
             }
         });
