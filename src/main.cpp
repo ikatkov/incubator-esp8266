@@ -23,7 +23,6 @@ Point sensor("incubator-esp8266");
 #define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
 #define WIFI_RETRY_INTERVAL 60000
-#define TEMP_HYSTERESIS 2
 #define EEPROM_ADDRESS 0
 
 OneWire oneWire(DS1820_PIN);
@@ -31,7 +30,7 @@ DallasTemperature sensors(&oneWire);
 
 u_int64_t lastTempReadingMs;
 u_int64_t lastWifiRetryMs;
-u8_t temp = 0;
+float temp = 0;
 u8_t setTemp = 0;
 String state = "Idle";
 
@@ -72,7 +71,7 @@ void make_ok_beep()
 void handle_getAPI()
 {
     Serial.println("Handling GET API request");
-    responseJSON["temp"] = temp;
+    responseJSON["temp"] = round(temp);
     responseJSON["setTemp"] = setTemp;
     responseJSON["state"] = state;
     String json;
@@ -127,7 +126,7 @@ void handle_NotFound()
 void processPID()
 {
 
-    if (temp - TEMP_HYSTERESIS < setTemp)
+    if (temp <= setTemp)
     {
         state = "Heating";
         digitalWrite(HEATER_PIN, HIGH);
@@ -236,7 +235,7 @@ void loop()
     if (lastTempReadingMs + TEMP_CHECK_INTERVAL < millis())
     {
         sensors.requestTemperatures();
-        temp = round(sensors.getTempCByIndex(0));
+        temp = sensors.getTempCByIndex(0);
         Serial.print(temp);
         Serial.println("ºC");
         lastTempReadingMs = millis();
