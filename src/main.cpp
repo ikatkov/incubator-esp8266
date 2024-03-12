@@ -4,10 +4,19 @@
 #include <OneWire.h>
 #include <ArduinoJson.h>
 #include <EEPROM.h>
+#include <InfluxDbClient.h>
+#include <InfluxDbCloud.h>
 
-/* Put your SSID & Password */
+/* WIFI SSID & Password + InfluxDB configs */
 #include "credentials.h"
+// raw data copied into a string on each build
 #include "index_html.h"
+
+#define TZ_INFO "UTC-8"
+// Declare InfluxDB client instance with preconfigured InfluxCloud certificate
+InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
+// Declare Data point
+Point sensor("incubator-esp8266");
 
 #define BUZZER_PIN D0
 #define DS1820_PIN D1
@@ -194,6 +203,7 @@ void setup()
     sensors.begin();
 
     connectToWifi();
+    timeSync(TZ_INFO, "pool.ntp.org", "time.nis.gov");
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);
@@ -202,6 +212,21 @@ void setup()
 
     server.begin();
     Serial.println("HTTP server started");
+
+    // Check InfluxDB server connection
+    if (client.validateConnection())
+    {
+        Serial.print("Connected to InfluxDB: ");
+        Serial.println(client.getServerUrl());
+    }
+    else
+    {
+        Serial.print("InfluxDB connection failed: ");
+        Serial.println(client.getLastErrorMessage());
+    }
+    // Add tags to the data point
+    sensor.addTag("device", "esp8266");
+    sensor.addTag("SSID", WiFi.SSID());
 }
 
 void loop()
@@ -215,6 +240,21 @@ void loop()
         Serial.print(temp);
         Serial.println("ºC");
         lastTempReadingMs = millis();
+
+        sensor.clearFields();
+        sensor.addField("temperature", temp);
+        sensor.addField("set_temperature", setTemp);
+        sensor.addField("state", state);
+        sensor.addField("rssi", WiFi.RSSI());
+        Serial.print("Writing: ");
+        Serial.println(sensor.toLineProtocol());
+
+        // Write point
+        if (!client.writePoint(sensor))
+        {
+            Serial.print("InfluxDB write failed: ");
+            Serial.println(client.getLastErrorMessage());
+        }
     }
     connectToWifi(false);
 }
