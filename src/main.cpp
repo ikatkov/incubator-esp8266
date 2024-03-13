@@ -23,12 +23,14 @@ Point sensor("incubator-esp8266");
 #define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
 #define WIFI_RETRY_INTERVAL 60000
+#define INFLUXDB_RETRY_INTERVAL 60000
 #define EEPROM_ADDRESS 0
 
 OneWire oneWire(DS1820_PIN);
 DallasTemperature sensors(&oneWire);
 
 u_int64_t lastTempReadingMs;
+u_int64_t nextInfluxDBWriteMs = 0;
 u_int64_t lastWifiRetryMs;
 float temp = 0;
 u8_t setTemp = 0;
@@ -240,19 +242,29 @@ void loop()
         Serial.println("ºC");
         lastTempReadingMs = millis();
 
-        sensor.clearFields();
-        sensor.addField("temperature", temp);
-        sensor.addField("set_temperature", setTemp);
-        sensor.addField("state", state);
-        sensor.addField("rssi", WiFi.RSSI());
-        Serial.print("Writing: ");
-        Serial.println(sensor.toLineProtocol());
-
-        // Write point
-        if (!client.writePoint(sensor))
+        if (WiFi.status() == WL_CONNECTED && nextInfluxDBWriteMs < millis())
         {
-            Serial.print("InfluxDB write failed: ");
-            Serial.println(client.getLastErrorMessage());
+            // Write to influxDB cloud
+            sensor.clearFields();
+            sensor.addField("temperature", temp);
+            sensor.addField("set_temperature", setTemp);
+            sensor.addField("state", state);
+            sensor.addField("rssi", WiFi.RSSI());
+            Serial.print("Writing: ");
+            Serial.println(sensor.toLineProtocol());
+
+            // Write point
+            if (client.writePoint(sensor))
+            {
+                Serial.println("Sent data to InfluxDB");
+                nextInfluxDBWriteMs = 0;
+            }
+            else
+            {
+                nextInfluxDBWriteMs = millis() + INFLUXDB_RETRY_INTERVAL;
+                Serial.print("InfluxDB write failed: ");
+                Serial.println(client.getLastErrorMessage());
+            }
         }
     }
     connectToWifi(false);
