@@ -1,5 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
 #include <ArduinoJson.h>
@@ -14,23 +16,24 @@
 
 #define TZ_INFO "UTC-8"
 // Declare InfluxDB client instance with preconfigured InfluxCloud certificate
-InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
+InfluxDBClient influxDBClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
 // Declare Data point
-Point sensor("incubator-esp8266");
+Point measurementPoint("incubator-esp8266");
 
 #define BUZZER_PIN D0
 #define DS1820_PIN D1
 #define HEATER_PIN D2
 #define TEMP_CHECK_INTERVAL 1000
 #define WIFI_RETRY_INTERVAL 60000
-#define INFLUXDB_RETRY_INTERVAL 60000
 #define EEPROM_ADDRESS 0
+#define MAX_BATCH_SIZE 60
+#define WRITE_BUFFER_SIZE 120
+#define WRITE_PRECISION WritePrecision::S
 
 OneWire oneWire(DS1820_PIN);
 DallasTemperature sensors(&oneWire);
 
 u_int64_t lastTempReadingMs;
-u_int64_t nextInfluxDBWriteMs = 0;
 u_int64_t lastWifiRetryMs;
 float temp = 0;
 u8_t setTemp = 0;
@@ -215,19 +218,39 @@ void setup()
     Serial.println("HTTP server started");
 
     // Check InfluxDB server connection
-    if (client.validateConnection())
+    if (influxDBClient.validateConnection())
     {
         Serial.print("Connected to InfluxDB: ");
-        Serial.println(client.getServerUrl());
+        Serial.println(influxDBClient.getServerUrl());
     }
     else
     {
         Serial.print("InfluxDB connection failed: ");
-        Serial.println(client.getLastErrorMessage());
+        Serial.println(influxDBClient.getLastErrorMessage());
     }
+    // Increase buffer to allow caching of failed writes
+    influxDBClient.setWriteOptions(WriteOptions().writePrecision(WRITE_PRECISION).batchSize(MAX_BATCH_SIZE).bufferSize(WRITE_BUFFER_SIZE));
+
     // Add tags to the data point
-    sensor.addTag("device", "esp8266");
-    sensor.addTag("SSID", WiFi.SSID());
+    measurementPoint.addTag("device", "esp8266");
+    measurementPoint.addTag("SSID", WiFi.SSID());
+
+    ArduinoOTA.onStart([]()
+                       { Serial.println("Start"); });
+    ArduinoOTA.onEnd([]()
+                     { Serial.println("\nEnd"); });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
+                          { Serial.printf("Progress: %u%%\r", (progress / (total / 100))); });
+    ArduinoOTA.onError([](ota_error_t error)
+                       {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed"); });
+    ArduinoOTA.begin();
+    Serial.println("OTA Ready");
 }
 
 void loop()
@@ -242,30 +265,21 @@ void loop()
         Serial.println("ºC");
         lastTempReadingMs = millis();
 
-        if (WiFi.status() == WL_CONNECTED && nextInfluxDBWriteMs < millis())
+        measurementPoint.clearFields();
+        measurementPoint.setTime(time(nullptr));
+        measurementPoint.addField("temperature", temp);
+        measurementPoint.addField("set_temperature", setTemp);
+        measurementPoint.addField("state", state);
+        measurementPoint.addField("rssi", WiFi.RSSI());
+        Serial.print("Write to buffer/server: ");
+        Serial.println(measurementPoint.toLineProtocol());
+        influxDBClient.writePoint(measurementPoint);
+        if (!influxDBClient.writePoint(measurementPoint))
         {
-            // Write to influxDB cloud
-            sensor.clearFields();
-            sensor.addField("temperature", temp);
-            sensor.addField("set_temperature", setTemp);
-            sensor.addField("state", state);
-            sensor.addField("rssi", WiFi.RSSI());
-            Serial.print("Writing: ");
-            Serial.println(sensor.toLineProtocol());
-
-            // Write point
-            if (client.writePoint(sensor))
-            {
-                Serial.println("Sent data to InfluxDB");
-                nextInfluxDBWriteMs = 0;
-            }
-            else
-            {
-                nextInfluxDBWriteMs = millis() + INFLUXDB_RETRY_INTERVAL;
-                Serial.print("InfluxDB write failed: ");
-                Serial.println(client.getLastErrorMessage());
-            }
+            Serial.print("InfluxDB write failed: ");
+            Serial.println(influxDBClient.getLastErrorMessage());
         }
     }
+
     connectToWifi(false);
 }
