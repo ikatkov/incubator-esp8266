@@ -9,6 +9,8 @@
 #include <InfluxDbClient.h>
 #include <InfluxDbCloud.h>
 
+#include "build_version.h"
+
 /* WIFI SSID & Password + InfluxDB configs */
 #include "credentials.h"
 // raw data copied into a string on each build
@@ -41,6 +43,7 @@ String state = "Idle";
 
 ESP8266WebServer server(80);
 JsonDocument responseJSON;
+JsonDocument versionJSON;
 JsonDocument requestJSON;
 
 bool isSetTempValid(uint8 value)
@@ -73,6 +76,17 @@ void make_ok_beep()
     }
 }
 
+void handle_getVersion()
+{
+    Serial.println("Handling GET version API request");
+    versionJSON["git_revision"] = GIT_REVISION;
+    versionJSON["build_timestamp"] = BUILD_TIMESTAMP;
+    String json;
+    serializeJson(versionJSON, json);
+    Serial.println(json);
+    server.send(200, "application/json", json);
+}
+
 void handle_getAPI()
 {
     Serial.println("Handling GET API request");
@@ -82,7 +96,7 @@ void handle_getAPI()
     String json;
     serializeJson(responseJSON, json);
     Serial.println(json);
-    server.send(200, "text/html", json);
+    server.send(200, "application/json", json);
 }
 
 void handle_postAPI()
@@ -211,7 +225,8 @@ void setup()
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);
-    server.on("/api/temp", HTTP_POST, handle_postAPI);
+    server.on("/api/temp", HTTP_GET, handle_getAPI);
+    server.on("/version", HTTP_POST, handle_getVersion);
     server.onNotFound(handle_NotFound);
 
     server.begin();
