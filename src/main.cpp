@@ -225,8 +225,7 @@ void setup()
 
     server.on("/", handle_indexHtml);
     server.on("/api/temp", HTTP_GET, handle_getAPI);
-    server.on("/api/temp", HTTP_GET, handle_getAPI);
-    server.on("/version", HTTP_POST, handle_getVersion);
+    server.on("/version", HTTP_GET, handle_getVersion);
     server.onNotFound(handle_NotFound);
 
     server.begin();
